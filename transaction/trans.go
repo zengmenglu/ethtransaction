@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/big"
 
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,25 +15,63 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func main(){
-	rawTxHex:=createTrans()
+const (
+	testNet         = "https://ropsten.infura.io/v3/fb3b49110c2a4509b449923a936dcfc7"
+	secp256k1PriKey = "fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19"
+	ethAccount      = "0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d" // 标准eth账户地址
+)
+
+func main() {
+	rawTxHex := createTrans()
 	sendTrans(rawTxHex)
+
 }
 
-// 交易签名
-func createTrans()string{
+// 创建交易和签名
+func createTrans() string {
 	// 连接以太坊测试链
-	client, err := ethclient.Dial("https://ropsten.infura.io/v3/fb3b49110c2a4509b449923a936dcfc7")
+	client, err := ethclient.Dial(testNet)
 	if err != nil {
 		log.Fatal(err)
+		return ""
 	}
 
-	// 解析 secp256k1 private key，获取了一个私钥
-	privateKey, err := crypto.HexToECDSA("fad9c8855b740a0b7ed4c221dbad0f33a83a49cad6b3fe8d5817ac83d38b6a19")
+	// 加载私钥
+	privateKey, err := crypto.HexToECDSA(secp256k1PriKey)
+	if err != nil {
+		return ""
+	}
+
+	// 构造交易
+	tx, err := formTrans(privateKey,client)
+	if err != nil {
+		return ""
+	}
+
+	chainID, err := client.NetworkID(context.Background())
 	if err != nil {
 		log.Fatal(err)
+		return ""
 	}
 
+	// 签名
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+	if err != nil {
+		log.Fatal(err)
+		return ""
+	}
+	fmt.Printf("signedTx:%s\n", signedTx.Hash().Hex())
+
+	ts := types.Transactions{signedTx}
+	rawTxBytes := ts.GetRlp(0)
+	rawTxHex := hex.EncodeToString(rawTxBytes)
+
+	fmt.Printf("rawTxHex:%s\n", rawTxHex)
+	return rawTxHex
+}
+
+// 生成庄户随机数
+func genNonce(privateKey *ecdsa.PrivateKey, client *ethclient.Client) (uint64, error) {
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
@@ -42,69 +79,61 @@ func createTrans()string{
 	}
 
 	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
+	return client.PendingNonceAt(context.Background(), fromAddress)
+}
+
+func formTrans(privateKey *ecdsa.PrivateKey, client *ethclient.Client) (*types.Transaction, error) {
+	nonce, err := genNonce(privateKey, client)
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
-	//value := big.NewInt(1000000000000000000) // in wei (1 eth)
-	value := big.NewInt(	1) // in wei (1 eth)
-	gasLimit := uint64(21000)                // in units
+	// 交易的ETH数量
+	value := big.NewInt(1)    // in wei (10^-18 eth)
+	gasLimit := uint64(22000) // in units
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
-	toAddress := common.HexToAddress("0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d")
-	var data []byte
+	toAddress := common.HexToAddress(ethAccount)
+	bytecode, err := client.CodeAt(context.Background(), toAddress, nil) // nil is latest block
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("bytecode:%v\n",bytecode)
+
+	var data = []byte("zml trans")
 
 	// 构造事务
 	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
-	fmt.Printf("trans:%+v\n",tx)
-
-	chainID, err := client.NetworkID(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 签名
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ts := types.Transactions{signedTx}
-	rawTxBytes := ts.GetRlp(0)
-	rawTxHex := hex.EncodeToString(rawTxBytes)
-
-	fmt.Printf("rawTxHex:%s\n",rawTxHex) // f86...772
-	return rawTxHex
+	fmt.Printf("trans:%+v\n", tx)
+	return tx, nil
 }
 
-func sendTrans(rawTxHex string){
-	client, err := ethclient.Dial("https://ropsten.infura.io/v3/fb3b49110c2a4509b449923a936dcfc7")
+// 发送Trans
+func sendTrans(rawTxHex string) {
+	client, err := ethclient.Dial(testNet)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//rawTxHex := "f86d8202b28477359400825208944592d8f8d7b001e72cb26a73e4fa1806a51ac79d880de0b6b3a7640000802ca05924bde7ef10aa88db9c66dd4f5fb16b46dff2319b9968be983118b57bb50562a001b24b31010004f13d9a26b320845257a6cfc2bf819a3d55e3fc86263c5f0772"
 
 	rawTxBytes, err := hex.DecodeString(rawTxHex)
 
 	tx := new(types.Transaction)
 	rlp.DecodeBytes(rawTxBytes, &tx)
-	fmt.Printf("rawTx:%+v\n",tx)
+	fmt.Printf("rawTx:%+v\n", tx)
 
 	err = client.SendTransaction(context.Background(), tx)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("tx sent: %s", tx.Hash().Hex()) // tx sent: 0xc429e5f128387d224ba8bed6885e86525e14bfdc2eb24b5e9c3351a1176fd81f
+	fmt.Printf("tx sent: %s", tx.Hash().Hex())
 }
 
 // 验证签名
-func verifyTrans(){
+func verifyTrans() {
 }
-
-
