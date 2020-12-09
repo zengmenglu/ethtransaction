@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"github.com/zengmenglu/ethtransaction/wallet"
 	"log"
 	"math/big"
 
@@ -22,9 +23,9 @@ const (
 )
 
 func main() {
-	rawTxHex := createTrans()
-	sendTrans(rawTxHex)
-
+	//rawTxHex := createTrans()
+	//sendTrans(rawTxHex)
+	wallet.NewWallet()
 }
 
 // 创建交易和签名
@@ -107,7 +108,7 @@ func formTrans(privateKey *ecdsa.PrivateKey, client *ethclient.Client) (*types.T
 
 	var data = []byte("zml trans")
 
-	// 构造事务
+	// 构造交易
 	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, data)
 	fmt.Printf("trans:%+v\n", tx)
 	return tx, nil
@@ -135,5 +136,11 @@ func sendTrans(rawTxHex string) {
 }
 
 // 验证签名
-func verifyTrans() {
-}
+//func verifyTrans(publicKey []byte, signedTx string) (bool, error){
+//	sign, err:=hex.DecodeString(signedTx)
+//	if err != nil{
+//		return false, err
+//	}
+//
+//	//crypto.VerifySignature(publicKey, sign,)
+//}
