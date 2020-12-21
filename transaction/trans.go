@@ -23,13 +23,13 @@ const (
 )
 
 func main() {
-	//rawTxHex := createTrans()
-	//sendTrans(rawTxHex)
+	//rawTxHex := CreateTrans()
+	//SendTrans(rawTxHex)
 	wallet.NewWallet()
 }
 
 // 创建交易和签名
-func createTrans() string {
+func CreateTrans() string {
 	// 连接以太坊测试链
 	client, err := ethclient.Dial(testNet)
 	if err != nil {
@@ -115,7 +115,7 @@ func formTrans(privateKey *ecdsa.PrivateKey, client *ethclient.Client) (*types.T
 }
 
 // 发送Trans
-func sendTrans(rawTxHex string) {
+func SendTrans(rawTxHex string) {
 	client, err := ethclient.Dial(testNet)
 	if err != nil {
 		log.Fatal(err)

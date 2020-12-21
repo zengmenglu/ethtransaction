@@ -15,11 +15,11 @@ func CreateKs(passphrase string) *keystore.KeyStore{
 		log.Fatal(err)
 	}
 
-	fmt.Println(account.Address.Hex())
+	fmt.Println("account address:",account.Address.Hex())
 	return ks
 }
 
-// 导出地址
+// 导出账户地址
 func importKs(ks *keystore.KeyStore, passphrase string) {
 	file:=ks.Accounts()[0].URL.Path
 	jsonBytes, err := ioutil.ReadFile(file)
@@ -33,5 +33,5 @@ func importKs(ks *keystore.KeyStore, passphrase string) {
 		log.Fatal(err)
 		return
 	}
-	fmt.Println(account.Address.Hex())
+	fmt.Println("account address:",account.Address.Hex())
 }
